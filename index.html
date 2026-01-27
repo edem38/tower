@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Send the Wave - Tower Defense PvP</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ÉCRAN MENU PRINCIPAL -->
+  <div id="menu-screen" class="screen active">
+    <div class="menu-container">
+      <h1 class="game-title">⚔️ SEND THE WAVE</h1>
+      <p class="subtitle">Tower Defense PvP</p>
+      
+      <div class="name-input">
+        <input type="text" id="player-name" placeholder="Votre pseudo..." maxlength="20">
+      </div>
+      
+      <div class="menu-buttons">
+        <button id="btn-quick-match" class="btn btn-primary">
+          ⚡ Match Rapide 1v1
+        </button>
+        <button id="btn-create-room" class="btn btn-secondary">
+          ➕ Créer une Partie
+        </button>
+        <button id="btn-join-room" class="btn btn-secondary">
+          🔗 Rejoindre (Code)
+        </button>
+        <button id="btn-vs-ai" class="btn btn-ai">
+          🤖 Jouer contre l'IA
+        </button>
+      </div>
+      
+      <div class="ai-difficulty" id="ai-options" style="display: none;">
+        <p>Difficulté :</p>
+        <div class="difficulty-buttons">
+          <button class="btn btn-small" data-difficulty="EASY">Facile</button>
+          <button class="btn btn-small active" data-difficulty="NORMAL">Normal</button>
+          <button class="btn btn-small" data-difficulty="HARD">Difficile</button>
+        </div>
+        <button id="btn-start-ai" class="btn btn-primary btn-start-ai">🎮 Lancer la partie</button>
+      </div>
+      
+      <div class="join-input" id="join-input" style="display: none;">
+        <input type="text" id="room-code-input" placeholder="Code de la room..." maxlength="5">
+        <button id="btn-join-submit" class="btn btn-small">Rejoindre</button>
+        <button id="btn-join-cancel" class="btn btn-small btn-cancel">Annuler</button>
+      </div>
+      
+      <div id="server-stats" class="stats"></div>
+    </div>
+  </div>
+
+  <!-- ÉCRAN LOBBY -->
+  <div id="lobby-screen" class="screen">
+    <div class="lobby-container">
+      <h2>🎮 Salle d'attente</h2>
+      <p class="room-code">Code: <span id="lobby-room-code">-----</span></p>
+      
+      <div id="players-list" class="players-list">
+        <!-- Joueurs listés ici -->
+      </div>
+      
+      <div class="lobby-buttons">
+        <button id="btn-ready" class="btn btn-primary">✓ Prêt</button>
+        <button id="btn-leave" class="btn btn-cancel">✕ Quitter</button>
+      </div>
+      
+      <p id="lobby-status" class="status-text"></p>
+    </div>
+  </div>
+
+  <!-- ÉCRAN DE JEU -->
+  <div id="game-screen" class="screen">
+    <!-- Canvas principal -->
+    <canvas id="game-canvas"></canvas>
+    
+    <!-- HUD Supérieur -->
+    <div id="hud-top">
+      <div class="hud-player hud-self">
+        <span class="player-name" id="hud-my-name">Moi</span>
+        <div class="hp-bar">
+          <div class="hp-fill" id="hud-my-hp-bar"></div>
+          <span class="hp-text" id="hud-my-hp">100</span>
+        </div>
+        <span class="gold" id="hud-my-gold">💰 150</span>
+      </div>
+      
+      <div class="hud-center">
+        <span class="timer" id="hud-timer">8:00</span>
+        <span class="wave-info" id="hud-wave">Vague 1</span>
+      </div>
+      
+      <div class="hud-player hud-enemy">
+        <span class="player-name" id="hud-enemy-name">Adversaire</span>
+        <div class="hp-bar">
+          <div class="hp-fill enemy" id="hud-enemy-hp-bar"></div>
+          <span class="hp-text" id="hud-enemy-hp">100</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barre de construction (bas) -->
+    <div id="build-bar">
+      <div class="tower-buttons">
+        <button class="tower-btn" data-tower="ARCHER" title="Archer - 50💰">
+          <span class="emoji">🏹</span>
+          <span class="cost">50</span>
+        </button>
+        <button class="tower-btn" data-tower="CANON" title="Canon - 80💰">
+          <span class="emoji">💣</span>
+          <span class="cost">80</span>
+        </button>
+        <button class="tower-btn" data-tower="ICE" title="Glace - 60💰">
+          <span class="emoji">❄️</span>
+          <span class="cost">60</span>
+        </button>
+      </div>
+      
+      <div class="action-buttons">
+        <button id="btn-upgrade" class="action-btn" disabled title="Améliorer">
+          ⬆️
+        </button>
+        <button id="btn-sell" class="action-btn" disabled title="Vendre">
+          💸
+        </button>
+      </div>
+    </div>
+
+    <!-- Barre d'attaque (droite) -->
+    <div id="attack-bar">
+      <span class="attack-title">ATTAQUER</span>
+      <button class="wave-btn" data-pack="SMALL_PACK" title="5x Rapides - 35💰">
+        <span class="emoji">👻×5</span>
+        <span class="cost">35</span>
+      </button>
+      <button class="wave-btn" data-pack="NORMAL_PACK" title="3x Normaux - 50💰">
+        <span class="emoji">👾×3</span>
+        <span class="cost">50</span>
+      </button>
+      <button class="wave-btn" data-pack="TANK_PACK" title="1x Tank - 60💰">
+        <span class="emoji">🤖</span>
+        <span class="cost">60</span>
+      </button>
+      <button class="wave-btn boss" data-pack="BOSS_PACK" title="1x Boss - 200💰">
+        <span class="emoji">👹</span>
+        <span class="cost">200</span>
+        <span class="cooldown" id="boss-cooldown"></span>
+      </button>
+    </div>
+
+    <!-- Panneau de sélection de tour -->
+    <div id="tower-info" style="display: none;">
+      <div class="tower-info-content">
+        <span class="tower-info-name" id="selected-tower-name">Archer Nv.1</span>
+        <span class="tower-info-stats" id="selected-tower-stats">DMG: 12 | Portée: 100</span>
+        <div class="tower-info-buttons">
+          <button id="btn-upgrade-selected">⬆️ Améliorer (<span id="upgrade-cost">40</span>💰)</button>
+          <button id="btn-sell-selected">💸 Vendre (+<span id="sell-value">25</span>💰)</button>
+          <button id="btn-close-info">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Countdown -->
+    <div id="countdown-overlay" style="display: none;">
+      <span id="countdown-number">3</span>
+    </div>
+
+    <!-- Debug overlay -->
+    <div id="debug-overlay" style="display: none;">
+      <div>FPS: <span id="debug-fps">0</span></div>
+      <div>Tick: <span id="debug-tick">0</span></div>
+      <div>Creeps: <span id="debug-creeps">0</span></div>
+      <div>Ping: <span id="debug-ping">0</span>ms</div>
+    </div>
+
+    <!-- Bouton Abandon -->
+    <button id="btn-surrender" class="surrender-btn" title="Abandonner">
+      🏳️ Abandon
+    </button>
+  </div>
+
+  <!-- ÉCRAN FIN DE PARTIE -->
+  <div id="end-screen" class="screen">
+    <div class="end-container">
+      <h2 id="end-title">🏆 Victoire !</h2>
+      <p id="end-reason"></p>
+      
+      <div id="end-stats" class="end-stats">
+        <!-- Stats de fin -->
+      </div>
+      
+      <div class="end-buttons">
+        <button id="btn-play-again" class="btn btn-primary">🔄 Rejouer</button>
+        <button id="btn-back-menu" class="btn btn-secondary">🏠 Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATIONS -->
+  <div id="notifications"></div>
+
+  <!-- Scripts -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
