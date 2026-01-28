@@ -97,6 +97,13 @@ const Game = {
   offsetX: 0,
   offsetY: 0,
   
+  // Zoom et pan mobile
+  minScale: 0.5,
+  maxScale: 2.0,
+  panX: 0,
+  panY: 0,
+  lastTapTime: 0,
+  
   // Rendu
   lastRender: 0,
   fps: 0,
@@ -375,6 +382,24 @@ function initUI() {
     surrender();
   });
   
+  // Contrôles mobiles
+  document.getElementById('btn-zoom-in').addEventListener('click', () => {
+    Sounds.click();
+    Game.scale = Math.min(Game.maxScale, Game.scale * 1.2);
+  });
+  
+  document.getElementById('btn-zoom-out').addEventListener('click', () => {
+    Sounds.click();
+    Game.scale = Math.max(Game.minScale, Game.scale / 1.2);
+  });
+  
+  document.getElementById('btn-reset-view').addEventListener('click', () => {
+    Sounds.click();
+    Game.panX = 0;
+    Game.panY = 0;
+    resizeCanvas(); // Reset scale aussi
+  });
+  
   // Info tour
   document.getElementById('btn-upgrade-selected').addEventListener('click', () => { Sounds.click(); upgradeSelected(); });
   document.getElementById('btn-sell-selected').addEventListener('click', () => { Sounds.click(); sellSelected(); });
@@ -411,6 +436,12 @@ function initCanvas() {
   Game.canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
   Game.canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
   Game.canvas.addEventListener('touchend', handleTouchEnd);
+  
+  // Zoom avec pinch
+  let lastPinchDistance = 0;
+  Game.canvas.addEventListener('gesturestart', (e) => e.preventDefault());
+  Game.canvas.addEventListener('gesturechange', (e) => e.preventDefault());
+  Game.canvas.addEventListener('gestureend', (e) => e.preventDefault());
 }
 
 function resizeCanvas() {
@@ -784,36 +815,105 @@ function handleCanvasClick(e) {
 
 function handleTouchStart(e) {
   e.preventDefault();
-  const touch = e.touches[0];
-  const rect = Game.canvas.getBoundingClientRect();
-  Game.touchStart = {
-    x: touch.clientX - rect.left,
-    y: touch.clientY - rect.top,
-    time: Date.now()
-  };
-  Game.isDragging = false;
+  const touches = e.touches;
+  
+  if (touches.length === 1) {
+    // Un doigt - pan ou clic
+    const touch = touches[0];
+    const rect = Game.canvas.getBoundingClientRect();
+    Game.touchStart = {
+      x: touch.clientX - rect.left,
+      y: touch.clientY - rect.top,
+      panX: Game.panX,
+      panY: Game.panY,
+      time: Date.now()
+    };
+    Game.isDragging = false;
+  } else if (touches.length === 2) {
+    // Deux doigts - zoom
+    const touch1 = touches[0];
+    const touch2 = touches[1];
+    const dx = touch2.clientX - touch1.clientX;
+    const dy = touch2.clientY - touch1.clientY;
+    Game.lastPinchDistance = Math.sqrt(dx * dx + dy * dy);
+    Game.lastScale = Game.scale;
+    Game.isDragging = false;
+  }
 }
 
 function handleTouchMove(e) {
   e.preventDefault();
-  if (Game.touchStart) {
-    const touch = e.touches[0];
+  const touches = e.touches;
+  
+  if (touches.length === 1 && Game.touchStart) {
+    // Pan avec un doigt
+    const touch = touches[0];
     const rect = Game.canvas.getBoundingClientRect();
-    const dx = touch.clientX - rect.left - Game.touchStart.x;
-    const dy = touch.clientY - rect.top - Game.touchStart.y;
+    const currentX = touch.clientX - rect.left;
+    const currentY = touch.clientY - rect.top;
+    const dx = currentX - Game.touchStart.x;
+    const dy = currentY - Game.touchStart.y;
     
     if (Math.sqrt(dx * dx + dy * dy) > 10) {
       Game.isDragging = true;
+      Game.panX = Game.touchStart.panX + dx;
+      Game.panY = Game.touchStart.panY + dy;
+      
+      // Limiter le pan
+      const mapWidth = (Game.constants?.MAP?.WIDTH || 800) * Game.scale;
+      const mapHeight = (Game.constants?.MAP?.HEIGHT || 600) * Game.scale;
+      Game.panX = Math.max(Math.min(Game.panX, 200), -mapWidth + Game.width - 200);
+      Game.panY = Math.max(Math.min(Game.panY, 200), -mapHeight + Game.height - 200);
     }
+  } else if (touches.length === 2 && Game.lastPinchDistance) {
+    // Zoom avec deux doigts
+    const touch1 = touches[0];
+    const touch2 = touches[1];
+    const dx = touch2.clientX - touch1.clientX;
+    const dy = touch2.clientY - touch1.clientY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    const scaleChange = distance / Game.lastPinchDistance;
+    Game.scale = Math.max(Game.minScale, Math.min(Game.maxScale, Game.lastScale * scaleChange));
+    Game.isDragging = true;
   }
 }
 
 function handleTouchEnd(e) {
-  if (Game.touchStart && !Game.isDragging) {
-    handleClick(Game.touchStart.x, Game.touchStart.y);
+  if (Game.touchStart && !Game.isDragging && e.touches.length === 0) {
+    // Détecter double-tap
+    const now = Date.now();
+    if (now - Game.lastTapTime < 300) {
+      // Double-tap détecté - toggle zoom
+      if (Game.scale > 1.2) {
+        // Dézoomer
+        Game.scale = Game.minScale;
+        Game.panX = 0;
+        Game.panY = 0;
+      } else {
+        // Zoomer sur le point tapé
+        const rect = Game.canvas.getBoundingClientRect();
+        const centerX = Game.touchStart.x - Game.width / 2;
+        const centerY = Game.touchStart.y - Game.height / 2;
+        
+        Game.scale = 1.5;
+        Game.panX = -centerX * 0.5;
+        Game.panY = -centerY * 0.5;
+      }
+    } else {
+      // Clic simple
+      handleClick(Game.touchStart.x, Game.touchStart.y);
+    }
+    Game.lastTapTime = now;
   }
-  Game.touchStart = null;
-  Game.isDragging = false;
+  
+  if (e.touches.length < 2) {
+    Game.lastPinchDistance = 0;
+  }
+  if (e.touches.length === 0) {
+    Game.touchStart = null;
+    Game.isDragging = false;
+  }
 }
 
 function handleCanvasMove(e) {
@@ -823,9 +923,9 @@ function handleCanvasMove(e) {
 function handleClick(screenX, screenY) {
   if (Game.screen !== 'game' || !Game.constants) return;
   
-  // Convertir en coordonnées de jeu
-  const gameX = (screenX - Game.offsetX) / Game.scale;
-  const gameY = (screenY - Game.offsetY) / Game.scale;
+  // Convertir en coordonnées de jeu (avec pan)
+  const gameX = (screenX - Game.offsetX - Game.panX) / Game.scale;
+  const gameY = (screenY - Game.offsetY - Game.panY) / Game.scale;
   
   // Vérifier les limites
   if (gameX < 0 || gameX > Game.constants.MAP.WIDTH ||
@@ -888,9 +988,9 @@ function render(timestamp) {
   // On peut dessiner la map même sans state (pendant countdown)
   if (!Game.constants) return;
   
-  // Transformer pour la map
+  // Transformer pour la map (avec pan et zoom)
   ctx.save();
-  ctx.translate(Game.offsetX, Game.offsetY);
+  ctx.translate(Game.offsetX + Game.panX, Game.offsetY + Game.panY);
   ctx.scale(Game.scale, Game.scale);
   
   // Fond de la map
@@ -966,6 +1066,17 @@ function render(timestamp) {
   
   // Debug info (optionnel)
   // drawDebug(ctx);
+  
+  // Mettre à jour l'indicateur de zoom
+  const zoomIndicator = document.getElementById('zoom-indicator');
+  if (zoomIndicator && Game.screen === 'game') {
+    const baseScale = Math.min(
+      Game.width / (Game.constants?.MAP?.WIDTH || 800),
+      (Game.height - 150) / (Game.constants?.MAP?.HEIGHT || 600)
+    );
+    const zoomPercent = Math.round((Game.scale / baseScale) * 100);
+    zoomIndicator.textContent = `${zoomPercent}%`;
+  }
 }
 
 function drawMap(ctx) {

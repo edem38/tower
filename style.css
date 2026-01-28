@@ -657,6 +657,55 @@ html, body {
   transform: translateX(150px) scale(0.95);
 }
 
+/* === CONTRÔLES MOBILES === */
+.mobile-controls {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 15;
+}
+
+.control-btn {
+  width: 50px;
+  height: 50px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid #4CAF50;
+  border-radius: 50%;
+  color: white;
+  font-size: 1.2em;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.control-btn:active {
+  transform: scale(0.9);
+  background: rgba(76, 175, 80, 0.5);
+}
+
+.zoom-indicator {
+  background: rgba(0, 0, 0, 0.7);
+  color: #4CAF50;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 0.8em;
+  text-align: center;
+  border: 1px solid #4CAF50;
+}
+
+/* Masquer sur desktop */
+@media (min-width: 768px) {
+  .mobile-controls {
+    display: none;
+  }
+}
+
 /* === ÉCRAN DE FIN === */
 .end-container {
   text-align: center;
@@ -767,21 +816,29 @@ html, body {
   }
   
   .tower-btn {
-    width: 60px;
-    height: 60px;
+    width: 70px;
+    height: 70px;
   }
   
   .tower-btn .emoji {
-    font-size: 1.5em;
+    font-size: 1.8em;
+  }
+  
+  .tower-btn .cost {
+    font-size: 0.9em;
   }
   
   .wave-btn {
-    width: 55px;
-    height: 50px;
+    width: 65px;
+    height: 60px;
   }
   
   .wave-btn .emoji {
-    font-size: 1.1em;
+    font-size: 1.4em;
+  }
+  
+  .wave-btn .cost {
+    font-size: 0.8em;
   }
   
   #attack-bar {
@@ -792,11 +849,26 @@ html, body {
   .hud-player {
     min-width: 100px;
     padding: 6px 10px;
+    font-size: 0.85em;
   }
   
   .timer {
     font-size: 1.2em;
     padding: 6px 15px;
+  }
+  
+  /* Boutons d'action plus gros sur mobile */
+  .action-btn {
+    width: 60px;
+    height: 60px;
+    font-size: 1.8em;
+  }
+  
+  /* Contrôles mobiles plus visibles */
+  .control-btn {
+    width: 55px;
+    height: 55px;
+    font-size: 1.3em;
   }
 }
 
