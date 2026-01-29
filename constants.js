@@ -49,43 +49,30 @@ const CONSTANTS = {
         { x: 200, y: 550 },
       ],
       zones: [
-        { x: 20, y: 130, width: 260, height: 50 },
-        { x: 120, y: 230, width: 260, height: 50 },
-        { x: 20, y: 330, width: 260, height: 50 },
-        { x: 120, y: 430, width: 260, height: 50 },
+        // Zone haute (entre spawn et premier virage)
+        { x: 20, y: 40, width: 280, height: 50 },
+        // Zone après premier virage horizontal
+        { x: 320, y: 80, width: 70, height: 140 },
+        // Zone milieu gauche
+        { x: 20, y: 130, width: 70, height: 160 },
+        // Zone entre les virages du milieu
+        { x: 120, y: 230, width: 160, height: 50 },
+        // Zone milieu droite
+        { x: 320, y: 230, width: 70, height: 160 },
+        // Zone entre virages bas
+        { x: 120, y: 330, width: 160, height: 50 },
+        // Zone bas gauche
+        { x: 20, y: 330, width: 70, height: 160 },
+        // Zone bas (près de la base)
+        { x: 120, y: 430, width: 160, height: 50 },
+        // Zone finale près de la base
+        { x: 220, y: 480, width: 80, height: 60 },
       ],
       basePosition: { x: 200, y: 550 },
       spawnPosition: { x: 0, y: 100 },
       theme: 'forest'
     },
-    SPIRAL: {
-      id: 'SPIRAL',
-      name: 'Spirale',
-      description: 'Chemin en spirale vers le centre',
-      path: [
-        { x: 50, y: 50 },
-        { x: 750, y: 50 },
-        { x: 750, y: 550 },
-        { x: 150, y: 550 },
-        { x: 150, y: 150 },
-        { x: 650, y: 150 },
-        { x: 650, y: 450 },
-        { x: 250, y: 450 },
-        { x: 250, y: 250 },
-        { x: 500, y: 250 },
-        { x: 500, y: 350 },
-        { x: 400, y: 350 },
-      ],
-      zones: [
-        { x: 100, y: 70, width: 600, height: 60 },
-        { x: 170, y: 170, width: 460, height: 60 },
-        { x: 270, y: 270, width: 200, height: 60 },
-        { x: 170, y: 470, width: 460, height: 60 },
-      ],
-      basePosition: { x: 400, y: 350 },
-      spawnPosition: { x: 50, y: 50 },
-      theme: 'desert'
-    },
+
     CROSSROADS: {
       id: 'CROSSROADS',
       name: 'Carrefour',
@@ -104,11 +91,26 @@ const CONSTANTS = {
         { x: 200, y: 550 },
       ],
       zones: [
-        { x: 20, y: 120, width: 160, height: 160 },
+        // Zone spawn gauche
+        { x: 20, y: 230, width: 160, height: 60 },
+        // Zone haut gauche
+        { x: 20, y: 80, width: 160, height: 130 },
+        // Zone haut centre-gauche
+        { x: 220, y: 40, width: 160, height: 50 },
+        // Zone haut centre-droite
+        { x: 420, y: 40, width: 160, height: 50 },
+        // Zone haut droite
         { x: 420, y: 120, width: 160, height: 160 },
-        { x: 220, y: 320, width: 160, height: 60 },
-        { x: 420, y: 420, width: 160, height: 60 },
-        { x: 620, y: 320, width: 160, height: 160 },
+        // Zone centre
+        { x: 220, y: 130, width: 160, height: 150 },
+        // Zone droite milieu
+        { x: 620, y: 230, width: 70, height: 160 },
+        // Zone bas droite
+        { x: 420, y: 320, width: 160, height: 70 },
+        // Zone bas centre
+        { x: 220, y: 420, width: 160, height: 70 },
+        // Zone près de la base
+        { x: 120, y: 480, width: 70, height: 70 },
       ],
       basePosition: { x: 200, y: 550 },
       spawnPosition: { x: 0, y: 300 },
@@ -144,6 +146,10 @@ const CONSTANTS = {
   },
   
   // === SYSTÈME DE COMBO (visuel uniquement, pas de bonus) ===
+  COMBO: {
+    WINDOW: 5,                    // Fenêtre de temps en secondes pour enchaîner
+    MAX_LEVEL: 5,                 // Niveau max de combo
+  },
   
   // === TOURS ===
   TOWERS: {

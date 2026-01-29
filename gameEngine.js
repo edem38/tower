@@ -70,6 +70,12 @@ class GameEngine {
         packCooldowns: {},
         abilityCooldowns: {},
         
+        // Combo (visuel uniquement)
+        combo: {
+          level: 0,
+          lastWaveTime: 0
+        },
+        
         // Stats
         goldEarned: CONSTANTS.PLAYER.START_GOLD,
         goldSpent: 0,
@@ -233,12 +239,18 @@ class GameEngine {
       );
       
       // Envoyer des creeps à chaque joueur
+      const self = this;
+      const roomCode = gameState.roomCode;
       for (const player of Object.values(gameState.players)) {
         if (player.hp <= 0) continue;
         
+        const targetPlayerId = player.id;
         for (let i = 0; i < creepCount; i++) {
           setTimeout(() => {
-            this.spawnCreep(gameState, 'NORMAL', player.id, null);
+            const currentGameState = self.games.get(roomCode);
+            if (currentGameState && currentGameState.status === 'playing') {
+              self.spawnCreep(currentGameState, 'NORMAL', targetPlayerId, null);
+            }
           }, i * 400);
         }
       }
@@ -679,6 +691,7 @@ class GameEngine {
    */
   isValidTowerPosition(gameState, playerId, x, y) {
     const path = gameState.map?.path || CONSTANTS.PATH_WAYPOINTS;
+    const zones = gameState.map?.zones || [];
     const minDist = CONSTANTS.MAP.TOWER_MIN_DISTANCE;
     const mapWidth = CONSTANTS.MAP.WIDTH;
     const mapHeight = CONSTANTS.MAP.HEIGHT;
@@ -686,6 +699,21 @@ class GameEngine {
     // Vérifier qu'on est dans les limites de la carte
     if (x < 20 || x > mapWidth - 20 || y < 20 || y > mapHeight - 20) {
       return false;
+    }
+    
+    // Vérifier qu'on est dans une zone de placement autorisée
+    if (zones.length > 0) {
+      let inZone = false;
+      for (const zone of zones) {
+        if (x >= zone.x && x <= zone.x + zone.width &&
+            y >= zone.y && y <= zone.y + zone.height) {
+          inZone = true;
+          break;
+        }
+      }
+      if (!inZone) {
+        return false;
+      }
     }
     
     // Vérifier qu'on n'est pas sur le chemin
@@ -920,10 +948,16 @@ class GameEngine {
     let speedMultiplier = 1 + (minutes * CONSTANTS.SCALING.SPEED_PER_MINUTE);
     speedMultiplier = Math.min(speedMultiplier, CONSTANTS.SCALING.MAX_SPEED_MULTIPLIER);
     
-    // Spawn les creeps
+    // Spawn les creeps - utiliser une closure pour capturer les valeurs
+    const self = this;
+    const roomCode = gameState.roomCode;
     for (let i = 0; i < pack.count; i++) {
       setTimeout(() => {
-        this.spawnCreep(gameState, pack.creepType, targetPlayerId, playerId, hpMultiplier, speedMultiplier);
+        // Vérifier que le jeu est toujours en cours
+        const currentGameState = self.games.get(roomCode);
+        if (currentGameState && currentGameState.status === 'playing') {
+          self.spawnCreep(currentGameState, pack.creepType, targetPlayerId, playerId, hpMultiplier, speedMultiplier);
+        }
       }, i * pack.delay);
     }
     
@@ -975,15 +1009,15 @@ class GameEngine {
    */
   getMinimalState(gameState, forPlayerId = null) {
     // Limiter les creeps envoyés
-    const maxCreepsToSend = 25;
+    const maxCreepsToSend = 60;
     const creepsToSend = gameState.creeps.slice(0, maxCreepsToSend);
     
     // Limiter les projectiles envoyés  
-    const maxProjectilesToSend = 15;
+    const maxProjectilesToSend = 30;
     const projectilesToSend = gameState.projectiles.slice(0, maxProjectilesToSend);
     
     // Limiter les effets envoyés
-    const maxEffectsToSend = 10;
+    const maxEffectsToSend = 15;
     const effectsToSend = gameState.effects.slice(0, maxEffectsToSend);
     
     return {
