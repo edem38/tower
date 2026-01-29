@@ -68,12 +68,7 @@ class GameEngine {
         
         towers: [],
         packCooldowns: {},
-        
-        // Système de combo
-        combo: {
-          level: 0,
-          lastWaveTime: 0,
-        },
+        abilityCooldowns: {},
         
         // Stats
         goldEarned: CONSTANTS.PLAYER.START_GOLD,
@@ -85,7 +80,9 @@ class GameEngine {
         stats: {
           towersBuilt: 0,
           towersUpgraded: 0,
-          towersSold: 0
+          towersSold: 0,
+          towersDestroyed: 0,
+          towersLost: 0
         }
       };
     }
@@ -182,14 +179,13 @@ class GameEngine {
         }
       }
       
-      // Vérifier expiration du combo
-      if (player.combo.level > 0) {
-        const timeSinceLastWave = (Date.now() - player.combo.lastWaveTime) / 1000;
-        if (timeSinceLastWave > CONSTANTS.COMBO.WINDOW) {
-          // Combo expiré
-          player.combo.level = 0;
+      // Cooldowns des capacités
+      for (const abilityId in player.abilityCooldowns) {
+        if (player.abilityCooldowns[abilityId] > 0) {
+          player.abilityCooldowns[abilityId] -= deltaTime;
         }
       }
+      
     }
 
     // Vagues automatiques
@@ -281,6 +277,60 @@ class GameEngine {
         continue;
       }
 
+      // === LOGIQUE SABOTEUR ===
+      if (creep.targetsTowers) {
+        // Trouver une tour cible si pas déjà définie
+        if (!creep.targetTowerId) {
+          const targetPlayer = gameState.players[creep.targetPlayerId];
+          if (targetPlayer && targetPlayer.towers.length > 0) {
+            // Choisir une tour aléatoire
+            const randomTower = targetPlayer.towers[Math.floor(Math.random() * targetPlayer.towers.length)];
+            creep.targetTowerId = randomTower.id;
+          } else {
+            // Pas de tours, aller vers la base normalement
+            creep.targetsTowers = false;
+          }
+        }
+        
+        // Se déplacer vers la tour cible
+        if (creep.targetTowerId) {
+          const targetPlayer = gameState.players[creep.targetPlayerId];
+          const targetTower = targetPlayer?.towers.find(t => t.id === creep.targetTowerId);
+          
+          if (targetTower) {
+            const dx = targetTower.x - creep.x;
+            const dy = targetTower.y - creep.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            // Appliquer le slow
+            let speedMultiplier = 1;
+            if (creep.slowUntil && Date.now() < creep.slowUntil) {
+              speedMultiplier = 1 - creep.slowAmount;
+            }
+            
+            const speed = creep.speed * speedMultiplier;
+            const moveDistance = speed * deltaTime;
+            
+            if (dist <= 10) {
+              // Atteint la tour - la détruire !
+              this.destroyTower(gameState, creep.targetPlayerId, creep.targetTowerId, creep.senderId);
+              gameState.creeps.splice(i, 1);
+              continue;
+            } else {
+              // Se déplacer vers la tour
+              creep.x += (dx / dist) * moveDistance;
+              creep.y += (dy / dist) * moveDistance;
+              creep.direction = Math.atan2(dy, dx);
+            }
+            continue;
+          } else {
+            // Tour détruite par autre chose, trouver nouvelle cible
+            creep.targetTowerId = null;
+          }
+        }
+      }
+
+      // === LOGIQUE NORMALE (non-saboteur) ===
       // Appliquer le slow
       let speedMultiplier = 1;
       if (creep.slowUntil && Date.now() < creep.slowUntil) {
@@ -628,20 +678,15 @@ class GameEngine {
    * Vérifie si une position est valide pour une tour
    */
   isValidTowerPosition(gameState, playerId, x, y) {
-    const zones = gameState.map?.zones || CONSTANTS.PLACEMENT_ZONES;
     const path = gameState.map?.path || CONSTANTS.PATH_WAYPOINTS;
     const minDist = CONSTANTS.MAP.TOWER_MIN_DISTANCE;
+    const mapWidth = CONSTANTS.MAP.WIDTH;
+    const mapHeight = CONSTANTS.MAP.HEIGHT;
     
-    // Vérifier qu'on est dans une zone valide
-    let inZone = false;
-    for (const zone of zones) {
-      if (x >= zone.x && x <= zone.x + zone.width &&
-          y >= zone.y && y <= zone.y + zone.height) {
-        inZone = true;
-        break;
-      }
+    // Vérifier qu'on est dans les limites de la carte
+    if (x < 20 || x > mapWidth - 20 || y < 20 || y > mapHeight - 20) {
+      return false;
     }
-    if (!inZone) return false;
     
     // Vérifier qu'on n'est pas sur le chemin
     for (let i = 0; i < path.length - 1; i++) {
@@ -732,6 +777,97 @@ class GameEngine {
   }
 
   /**
+   * Détruit une tour (par saboteur ou missile)
+   */
+  destroyTower(gameState, playerId, towerId, destroyerId = null) {
+    const player = gameState.players[playerId];
+    if (!player) return { success: false, error: 'Joueur introuvable' };
+    
+    const towerIndex = player.towers.findIndex(t => t.id === towerId);
+    if (towerIndex === -1) return { success: false, error: 'Tour introuvable' };
+    
+    const tower = player.towers[towerIndex];
+    
+    // Effet d'explosion
+    gameState.effects.push({
+      type: 'towerDestroyed',
+      x: tower.x,
+      y: tower.y,
+      playerId: playerId,
+      duration: 1.0
+    });
+    
+    // Retirer la tour
+    player.towers.splice(towerIndex, 1);
+    player.stats.towersLost = (player.stats.towersLost || 0) + 1;
+    
+    // Stats pour le destructeur
+    if (destroyerId) {
+      const destroyer = gameState.players[destroyerId];
+      if (destroyer) {
+        destroyer.stats.towersDestroyed = (destroyer.stats.towersDestroyed || 0) + 1;
+      }
+    }
+    
+    return { success: true, tower };
+  }
+
+  /**
+   * Utilise la capacité missile
+   */
+  useMissile(gameState, playerId, targetPlayerId, targetTowerId) {
+    const player = gameState.players[playerId];
+    if (!player) return { success: false, error: 'Joueur introuvable' };
+    
+    const ability = CONSTANTS.ABILITIES.MISSILE;
+    
+    // Vérifier le coût
+    if (player.gold < ability.cost) {
+      return { success: false, error: 'Or insuffisant' };
+    }
+    
+    // Vérifier le cooldown
+    if (!player.abilityCooldowns) player.abilityCooldowns = {};
+    if (player.abilityCooldowns['MISSILE'] && player.abilityCooldowns['MISSILE'] > 0) {
+      return { success: false, error: 'En recharge' };
+    }
+    
+    // Vérifier la cible
+    const targetPlayer = gameState.players[targetPlayerId];
+    if (!targetPlayer) return { success: false, error: 'Cible introuvable' };
+    
+    const targetTower = targetPlayer.towers.find(t => t.id === targetTowerId);
+    if (!targetTower) return { success: false, error: 'Tour cible introuvable' };
+    
+    // Débiter l'or
+    player.gold -= ability.cost;
+    player.goldSpent += ability.cost;
+    
+    // Appliquer le cooldown
+    player.abilityCooldowns['MISSILE'] = ability.cooldown;
+    
+    // Créer l'effet de missile
+    gameState.effects.push({
+      type: 'missile',
+      startX: 50,
+      startY: 50,
+      targetX: targetTower.x,
+      targetY: targetTower.y,
+      targetTowerId: targetTowerId,
+      targetPlayerId: targetPlayerId,
+      playerId: playerId,
+      duration: 1.5
+    });
+    
+    // Détruire la tour après un délai (pour l'animation)
+    setTimeout(() => {
+      this.destroyTower(gameState, targetPlayerId, targetTowerId, playerId);
+    }, 1500);
+    
+    return { success: true };
+  }
+
+  /**
    * Envoie une vague de creeps
    */
   sendWave(gameState, playerId, packId, targetPlayerId) {
@@ -763,23 +899,6 @@ class GameEngine {
       return { success: false, error: 'Cooldown en cours' };
     }
     
-    // === SYSTÈME DE COMBO (visuel uniquement) ===
-    const now = Date.now();
-    const timeSinceLastWave = (now - player.combo.lastWaveTime) / 1000;
-    
-    if (player.combo.lastWaveTime > 0 && timeSinceLastWave <= CONSTANTS.COMBO.WINDOW) {
-      player.combo.level = Math.min(player.combo.level + 1, CONSTANTS.COMBO.MAX_LEVEL);
-    } else {
-      player.combo.level = 1;
-    }
-    player.combo.lastWaveTime = now;
-    
-    if (player.combo.level > player.maxCombo) {
-      player.maxCombo = player.combo.level;
-    }
-    
-    const comboData = CONSTANTS.COMBO.MULTIPLIERS[player.combo.level] || CONSTANTS.COMBO.MULTIPLIERS[0];
-    
     // Débiter l'or
     player.gold -= pack.cost;
     player.goldSpent += pack.cost;
@@ -810,24 +929,7 @@ class GameEngine {
     
     player.creepsSent += pack.count;
     
-    // Effet de combo pour le feedback visuel
-    if (player.combo.level >= 2) {
-      gameState.effects.push({
-        type: 'combo',
-        playerId: playerId,
-        level: player.combo.level,
-        name: comboData.name,
-        duration: 1.5
-      });
-    }
-    
-    return { 
-      success: true, 
-      combo: {
-        level: player.combo.level,
-        name: comboData.name
-      }
-    };
+    return { success: true };
   }
 
   /**
@@ -858,7 +960,10 @@ class GameEngine {
       direction: 0,
       // Indicateurs visuels
       isScaled: hpMultiplier > 1.2,
-      scaleLevel: hpMultiplier
+      scaleLevel: hpMultiplier,
+      // Saboteur spécifique
+      targetsTowers: creepDef.targetsTowers || false,
+      targetTowerId: null  // Sera défini dans update
     };
     
     gameState.creeps.push(creep);

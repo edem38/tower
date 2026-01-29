@@ -290,6 +290,10 @@ html, body {
   height: 100%;
 }
 
+#game-canvas.targeting {
+  cursor: crosshair;
+}
+
 /* === HUD SUPÉRIEUR === */
 #hud-top {
   position: absolute;
@@ -513,6 +517,57 @@ html, body {
 }
 
 .wave-btn .cooldown {
+  position: absolute;
+  font-size: 0.7em;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 2px 5px;
+  border-radius: 5px;
+  bottom: 2px;
+}
+
+/* === BOUTON CAPACITÉ === */
+.ability-btn {
+  width: 65px;
+  height: 55px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(145deg, #1565C0, #0D47A1);
+  border: 2px solid #2196F3;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.ability-btn:active {
+  transform: scale(0.95);
+}
+
+.ability-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ability-btn.active {
+  background: linear-gradient(145deg, #43A047, #2E7D32);
+  border-color: #4CAF50;
+  box-shadow: 0 0 20px rgba(76, 175, 80, 0.6);
+}
+
+.ability-btn .emoji {
+  font-size: 1.3em;
+}
+
+.ability-btn .cost {
+  font-size: 0.7em;
+  color: #FFD700;
+}
+
+.ability-btn .cooldown {
   position: absolute;
   font-size: 0.7em;
   color: #fff;
@@ -829,21 +884,39 @@ html, body {
   }
   
   .wave-btn {
-    width: 65px;
-    height: 60px;
+    width: 75px;
+    height: 68px;
   }
   
   .wave-btn .emoji {
-    font-size: 1.4em;
+    font-size: 1.5em;
   }
   
   .wave-btn .cost {
-    font-size: 0.8em;
+    font-size: 0.85em;
+  }
+  
+  .ability-btn {
+    width: 75px;
+    height: 68px;
+  }
+  
+  .ability-btn .emoji {
+    font-size: 1.5em;
+  }
+  
+  .ability-btn .cost {
+    font-size: 0.85em;
   }
   
   #attack-bar {
     right: 5px;
     padding: 8px;
+    gap: 10px;
+  }
+  
+  .attack-title {
+    font-size: 0.75em;
   }
   
   .hud-player {

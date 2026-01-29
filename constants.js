@@ -144,21 +144,6 @@ const CONSTANTS = {
   },
   
   // === SYSTÈME DE COMBO (visuel uniquement, pas de bonus) ===
-  COMBO: {
-    // Temps max entre deux envois pour maintenir le combo (secondes)
-    WINDOW: 5,
-    // Niveaux de combo (pas de bonus, juste visuel)
-    MULTIPLIERS: [
-      { level: 0, name: '' },
-      { level: 1, name: 'Combo x1' },
-      { level: 2, name: 'Combo x2!' },
-      { level: 3, name: 'Combo x3!!' },
-      { level: 4, name: 'SUPER COMBO!!!' },
-      { level: 5, name: '🔥 MEGA COMBO 🔥' },
-    ],
-    // Combo max
-    MAX_LEVEL: 5,
-  },
   
   // === TOURS ===
   TOWERS: {
@@ -254,6 +239,18 @@ const CONSTANTS = {
       damage: 25,
       color: '#F44336',
       size: 28
+    },
+    SABOTEUR: {
+      id: 'SABOTEUR',
+      name: 'Saboteur',
+      emoji: '🥷',
+      hp: 150,
+      speed: 65,
+      reward: 50,
+      damage: 0,              // Ne fait pas de dégâts à la base
+      color: '#673AB7',
+      size: 18,
+      targetsTowers: true     // Cible les tours au lieu de la base
     }
   },
   
@@ -294,6 +291,27 @@ const CONSTANTS = {
       cost: 200,
       delay: 0,
       cooldown: 60
+    },
+    SABOTEUR_PACK: {
+      id: 'SABOTEUR_PACK',
+      name: '1x Saboteur',
+      creepType: 'SABOTEUR',
+      count: 1,
+      cost: 180,
+      delay: 0,
+      cooldown: 30
+    }
+  },
+  
+  // === CAPACITÉS SPÉCIALES ===
+  ABILITIES: {
+    MISSILE: {
+      id: 'MISSILE',
+      name: 'Missile',
+      emoji: '🚀',
+      cost: 250,
+      cooldown: 45,
+      description: 'Détruit une tour ennemie'
     }
   },
   
@@ -310,7 +328,7 @@ const CONSTANTS = {
     TOWER_INTERVAL: 7000,     // ms entre placements de tour
     ATTACK_INTERVAL: 10000,   // ms entre envois de vagues
     COMBO_CHANCE: 0.2,        // Chance de faire des combos (réduit)
-    MAX_CREEPS: 20,           // Limite de creeps sur la map (réduit)
+    MAX_CREEPS: 60,           // Limite de creeps sur la map (augmenté)
     DIFFICULTY: {
       EASY: { goldMultiplier: 0.8, accuracy: 0.6, attackSpeed: 1.5 },
       NORMAL: { goldMultiplier: 1.0, accuracy: 0.75, attackSpeed: 1.0 },
@@ -319,7 +337,7 @@ const CONSTANTS = {
   }
 };
 
-// Zones de placement par défaut (pour compatibilité)
-CONSTANTS.PLACEMENT_ZONES = CONSTANTS.MAPS.SERPENT.zones;
+// Zones de placement désactivées - on peut construire partout
+// CONSTANTS.PLACEMENT_ZONES = CONSTANTS.MAPS.SERPENT.zones;
 
 module.exports = CONSTANTS;
