@@ -116,11 +116,113 @@ const Game = {
   
   // Touch
   touchStart: null,
-  isDragging: false
+  isDragging: false,
+  
+  // === DÉTECTION APPAREIL ET TAILLES ADAPTATIVES ===
+  isMobile: false,
+  isTablet: false,
+  deviceType: 'desktop', // 'mobile', 'tablet', 'desktop'
+  
+  // Facteurs de taille selon l'appareil (seront calculés dans detectDevice)
+  sizeFactor: 1.0,
+  
+  // Tailles calculées (mises à jour par updateSizes)
+  sizes: {
+    // Tours
+    towerRadius: 18,
+    towerEmoji: 20,
+    towerBorder: 2,
+    towerLevelFont: 10,
+    
+    // Creeps (facteurs appliqués aux tailles de base)
+    creepScale: 1.0,
+    creepEmojiScale: 1.0,
+    creepHpBarHeight: 4,
+    
+    // Projectiles
+    projectileSize: 5,
+    
+    // Général
+    minCreepSize: 6,
+    maxCreepSize: 24
+  }
 };
+
+/**
+ * Détecte le type d'appareil et configure les tailles
+ */
+function detectDevice() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const minDimension = Math.min(width, height);
+  
+  // Détection basée sur la taille d'écran et le touch
+  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  
+  if (minDimension < 500 || (hasTouch && width < 768)) {
+    Game.isMobile = true;
+    Game.isTablet = false;
+    Game.deviceType = 'mobile';
+    Game.sizeFactor = 0.6; // 60% de la taille normale
+  } else if (minDimension < 900 || (hasTouch && width < 1024)) {
+    Game.isMobile = false;
+    Game.isTablet = true;
+    Game.deviceType = 'tablet';
+    Game.sizeFactor = 0.85; // 85% de la taille normale
+  } else {
+    Game.isMobile = false;
+    Game.isTablet = false;
+    Game.deviceType = 'desktop';
+    Game.sizeFactor = 1.0; // Taille normale
+  }
+  
+  updateSizes();
+  console.log(`[DEVICE] Type: ${Game.deviceType}, Factor: ${Game.sizeFactor}, Screen: ${width}x${height}`);
+}
+
+/**
+ * Met à jour les tailles en fonction du facteur et du zoom
+ */
+function updateSizes() {
+  const factor = Game.sizeFactor;
+  
+  // Facteur de zoom inversé (plus on zoom, plus les éléments peuvent être petits visuellement)
+  // Mais on garde une taille minimum lisible
+  const zoomFactor = Math.max(0.7, Math.min(1.3, 1 / Game.scale));
+  const combinedFactor = factor * zoomFactor;
+  
+  Game.sizes = {
+    // Tours - taille fixe mais adaptée à l'appareil
+    towerRadius: Math.round(18 * factor),
+    towerEmoji: Math.round(20 * factor),
+    towerBorder: Math.max(1, Math.round(2 * factor)),
+    towerLevelFont: Math.round(10 * factor),
+    towerRangeIndicator: Math.round(25 * factor),
+    
+    // Creeps - s'adaptent au zoom aussi
+    creepScale: combinedFactor,
+    creepEmojiScale: combinedFactor,
+    creepHpBarHeight: Math.max(2, Math.round(4 * factor)),
+    creepBorder: Math.max(1, Math.round(2 * factor)),
+    
+    // Projectiles
+    projectileSize: Math.max(2, Math.round(5 * combinedFactor)),
+    projectileTrail: Math.max(2, Math.round(4 * combinedFactor)),
+    
+    // Limites pour les creeps
+    minCreepSize: Game.isMobile ? 5 : 8,
+    maxCreepSize: Game.isMobile ? 16 : 24,
+    
+    // Mode simplifié sur mobile (cercles au lieu d'emojis si trop petit)
+    useSimpleMode: Game.isMobile && Game.scale < 0.8
+  };
+}
 
 // === INITIALISATION ===
 document.addEventListener('DOMContentLoaded', () => {
+  // Détecter le type d'appareil en premier
+  detectDevice();
+  
   Sounds.init();
   initSocket();
   initUI();
@@ -145,6 +247,11 @@ document.addEventListener('DOMContentLoaded', () => {
       Sounds.audioContext.resume();
     }
   }, { once: true });
+  
+  // Re-détecter si la fenêtre change de taille (rotation, etc.)
+  window.addEventListener('resize', () => {
+    detectDevice();
+  });
 });
 
 // === SOCKET.IO ===
@@ -386,11 +493,13 @@ function initUI() {
   document.getElementById('btn-zoom-in').addEventListener('click', () => {
     Sounds.click();
     Game.scale = Math.min(Game.maxScale, Game.scale * 1.2);
+    updateSizes(); // Mettre à jour les tailles
   });
   
   document.getElementById('btn-zoom-out').addEventListener('click', () => {
     Sounds.click();
     Game.scale = Math.max(Game.minScale, Game.scale / 1.2);
+    updateSizes(); // Mettre à jour les tailles
   });
   
   document.getElementById('btn-reset-view').addEventListener('click', () => {
@@ -398,6 +507,7 @@ function initUI() {
     Game.panX = 0;
     Game.panY = 0;
     resizeCanvas(); // Reset scale aussi
+    updateSizes(); // Mettre à jour les tailles
   });
   
   // Info tour
@@ -876,6 +986,7 @@ function handleTouchMove(e) {
     const scaleChange = distance / Game.lastPinchDistance;
     Game.scale = Math.max(Game.minScale, Math.min(Game.maxScale, Game.lastScale * scaleChange));
     Game.isDragging = true;
+    updateSizes(); // Mettre à jour les tailles pendant le pinch
   }
 }
 
@@ -900,6 +1011,7 @@ function handleTouchEnd(e) {
         Game.panX = -centerX * 0.5;
         Game.panY = -centerY * 0.5;
       }
+      updateSizes(); // Mettre à jour les tailles après double-tap
     } else {
       // Clic simple
       handleClick(Game.touchStart.x, Game.touchStart.y);
@@ -1207,6 +1319,8 @@ function drawPath(ctx) {
 function drawTowers(ctx) {
   if (!Game.state || !Game.state.players) return;
   
+  const sizes = Game.sizes;
+  
   for (const player of Game.state.players) {
     if (!player.towers) continue;
     for (const tower of player.towers) {
@@ -1221,7 +1335,7 @@ function drawTowers(ctx) {
         
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = sizes.towerBorder;
         ctx.beginPath();
         ctx.arc(tower.x, tower.y, range, 0, Math.PI * 2);
         ctx.fill();
@@ -1231,34 +1345,44 @@ function drawTowers(ctx) {
       // Base de la tour
       ctx.fillStyle = isMine ? def.color : '#666';
       ctx.beginPath();
-      ctx.arc(tower.x, tower.y, 18, 0, Math.PI * 2);
+      ctx.arc(tower.x, tower.y, sizes.towerRadius, 0, Math.PI * 2);
       ctx.fill();
       
       // Bordure
       ctx.strokeStyle = isSelected ? '#FFD700' : (isMine ? '#fff' : '#999');
-      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.lineWidth = isSelected ? sizes.towerBorder + 1 : sizes.towerBorder;
       ctx.stroke();
       
-      // Emoji
-      ctx.font = '20px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#fff';
-      ctx.fillText(def.emoji, tower.x, tower.y);
+      // Emoji ou cercle simple selon le mode
+      if (sizes.useSimpleMode) {
+        // Mode simplifié : juste un symbole au centre
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(tower.x, tower.y, sizes.towerRadius * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Mode normal avec emoji
+        ctx.font = `${sizes.towerEmoji}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(def.emoji, tower.x, tower.y);
+      }
       
-      // Niveau
+      // Niveau (étoiles)
       if (tower.level > 1) {
         ctx.fillStyle = '#FFD700';
-        ctx.font = 'bold 10px Arial';
-        ctx.fillText('★'.repeat(tower.level - 1), tower.x, tower.y + 22);
+        ctx.font = `bold ${sizes.towerLevelFont}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillText('★'.repeat(tower.level - 1), tower.x, tower.y + sizes.towerRadius + 4);
       }
       
       // Animation de tir
       if (tower.lastFire && Date.now() - tower.lastFire < 150) {
         ctx.strokeStyle = def.color;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = sizes.towerBorder + 1;
         ctx.beginPath();
-        ctx.arc(tower.x, tower.y, 25, 0, Math.PI * 2);
+        ctx.arc(tower.x, tower.y, sizes.towerRangeIndicator, 0, Math.PI * 2);
         ctx.stroke();
       }
     }
@@ -1268,54 +1392,71 @@ function drawTowers(ctx) {
 function drawCreeps(ctx) {
   if (!Game.state || !Game.state.creeps) return;
   
+  const sizes = Game.sizes;
+  
   for (const creep of Game.state.creeps) {
     const def = Game.constants.CREEPS[creep.type];
     const isTargetingMe = creep.targetPlayerId === Game.playerId;
     
-    // Ombre
+    // Calculer la taille adaptative du creep
+    let creepSize = def.size * sizes.creepScale;
+    creepSize = Math.max(sizes.minCreepSize, Math.min(sizes.maxCreepSize, creepSize));
+    
+    const emojiSize = Math.round(creepSize * sizes.creepEmojiScale);
+    
+    // Ombre (plus petite sur mobile)
     ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.beginPath();
-    ctx.ellipse(creep.x + 2, creep.y + 4, def.size * 0.8, def.size * 0.4, 0, 0, Math.PI * 2);
+    ctx.ellipse(creep.x + 2, creep.y + 3, creepSize * 0.7, creepSize * 0.35, 0, 0, Math.PI * 2);
     ctx.fill();
     
-    // Aura pour les creeps scalés (combo)
-    if (creep.isScaled) {
+    // Aura pour les creeps scalés (combo) - seulement si pas en mode simplifié
+    if (creep.isScaled && !sizes.useSimpleMode) {
       ctx.fillStyle = 'rgba(255, 100, 0, 0.3)';
       ctx.beginPath();
-      ctx.arc(creep.x, creep.y, def.size + 6, 0, Math.PI * 2);
+      ctx.arc(creep.x, creep.y, creepSize + 4, 0, Math.PI * 2);
       ctx.fill();
     }
     
-    // Corps
+    // Corps du creep
     ctx.fillStyle = creep.isSlowed ? '#88CCFF' : def.color;
     ctx.beginPath();
-    ctx.arc(creep.x, creep.y, def.size, 0, Math.PI * 2);
+    ctx.arc(creep.x, creep.y, creepSize, 0, Math.PI * 2);
     ctx.fill();
     
     // Bordure selon si nous menace + scaled
     if (creep.isScaled) {
       ctx.strokeStyle = '#FF6600';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = sizes.creepBorder + 1;
     } else {
       ctx.strokeStyle = isTargetingMe ? '#f44336' : '#333';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = sizes.creepBorder;
     }
     ctx.stroke();
     
-    // Emoji
-    ctx.font = `${def.size}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(def.emoji, creep.x, creep.y);
+    // Emoji ou cercle simple selon le mode et la taille
+    if (sizes.useSimpleMode || creepSize < 8) {
+      // Mode simplifié : petit point au centre
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(creep.x, creep.y, creepSize * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Mode normal avec emoji
+      ctx.font = `${emojiSize}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(def.emoji, creep.x, creep.y);
+    }
     
-    // Barre de vie
+    // Barre de vie (adaptative)
     const hpPercent = creep.hp / creep.maxHp;
-    const barWidth = def.size * 2;
-    const barHeight = 4;
+    const barWidth = creepSize * 1.8;
+    const barHeight = sizes.creepHpBarHeight;
     const barX = creep.x - barWidth / 2;
-    const barY = creep.y - def.size - 8;
+    const barY = creep.y - creepSize - barHeight - 2;
     
-    // Fond
+    // Fond de la barre
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.fillRect(barX, barY, barWidth, barHeight);
     
@@ -1327,17 +1468,19 @@ function drawCreeps(ctx) {
     }
     ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
     
-    // Indicateur de slow
-    if (creep.isSlowed) {
+    // Indicateur de slow (seulement si assez grand)
+    if (creep.isSlowed && creepSize >= 10 && !sizes.useSimpleMode) {
       ctx.fillStyle = '#2196F3';
-      ctx.font = '12px Arial';
-      ctx.fillText('❄', creep.x + def.size, creep.y - def.size);
+      ctx.font = `${Math.round(emojiSize * 0.6)}px Arial`;
+      ctx.fillText('❄', creep.x + creepSize, creep.y - creepSize);
     }
   }
 }
 
 function drawProjectiles(ctx) {
   if (!Game.state || !Game.state.projectiles) return;
+  
+  const sizes = Game.sizes;
   
   for (const proj of Game.state.projectiles) {
     const def = Game.constants.TOWERS[proj.towerType];
@@ -1346,19 +1489,19 @@ function drawProjectiles(ctx) {
     ctx.fillStyle = def.color;
     ctx.globalAlpha = 0.5;
     ctx.beginPath();
-    ctx.arc(proj.x, proj.y, 4, 0, Math.PI * 2);
+    ctx.arc(proj.x, proj.y, sizes.projectileTrail, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
     
     // Projectile
     ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(proj.x, proj.y, 5, 0, Math.PI * 2);
+    ctx.arc(proj.x, proj.y, sizes.projectileSize, 0, Math.PI * 2);
     ctx.fill();
     
     ctx.fillStyle = def.color;
     ctx.beginPath();
-    ctx.arc(proj.x, proj.y, 3, 0, Math.PI * 2);
+    ctx.arc(proj.x, proj.y, sizes.projectileSize * 0.6, 0, Math.PI * 2);
     ctx.fill();
   }
 }
